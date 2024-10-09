@@ -7,18 +7,19 @@
     <resultMap id="BaseResultMap" type="com.yupi.springbootinit.model.entity.Chart">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="goal" column="goal" jdbcType="VARCHAR"/>
-            <result property="chartdata" column="chartData" jdbcType="VARCHAR"/>
-            <result property="charttype" column="chartType" jdbcType="VARCHAR"/>
-            <result property="genchart" column="genChart" jdbcType="VARCHAR"/>
-            <result property="genresult" column="genResult" jdbcType="VARCHAR"/>
-            <result property="userid" column="userId" jdbcType="BIGINT"/>
-            <result property="createtime" column="createTime" jdbcType="TIMESTAMP"/>
-            <result property="updatetime" column="updateTime" jdbcType="TIMESTAMP"/>
-            <result property="isdelete" column="isDelete" jdbcType="TINYINT"/>
+            <result property="name" column="name" jdbcType="VARCHAR"/>
+            <result property="chartData" column="chartData" jdbcType="VARCHAR"/>
+            <result property="chartType" column="chartType" jdbcType="VARCHAR"/>
+            <result property="genChart" column="genChart" jdbcType="VARCHAR"/>
+            <result property="genResult" column="genResult" jdbcType="VARCHAR"/>
+            <result property="userId" column="userId" jdbcType="BIGINT"/>
+            <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="isDelete" jdbcType="TINYINT"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,goal,chartData,
+        id,name,goal,chartData,
         chartType,genChart,genResult,
         userId,createTime,updateTime,
         isDelete
