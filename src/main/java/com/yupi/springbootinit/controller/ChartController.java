@@ -11,9 +11,11 @@ import com.yupi.springbootinit.constant.CommonConstant;
 import com.yupi.springbootinit.constant.UserConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.exception.ThrowUtils;
+import com.yupi.springbootinit.manager.AiManager;
 import com.yupi.springbootinit.model.dto.chart.*;
 import com.yupi.springbootinit.model.entity.Chart;
 import com.yupi.springbootinit.model.entity.User;
+import com.yupi.springbootinit.model.vo.BiResponse;
 import com.yupi.springbootinit.service.ChartService;
 import com.yupi.springbootinit.service.UserService;
 import com.yupi.springbootinit.utils.ExcelUtils;
@@ -41,6 +43,10 @@ public class ChartController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AiManager aiManager;
+
 
     // region 增删改查
 
@@ -260,7 +266,7 @@ public class ChartController {
      * @return
      */
     @PostMapping("/upload")
-    public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
+    public BaseResponse<BiResponse> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
                                            GenCharByAiRequest genCharByAiRequest, HttpServletRequest request) {
         String name = genCharByAiRequest.getName();
         String goal = genCharByAiRequest.getGoal();
@@ -269,40 +275,59 @@ public class ChartController {
         // 校验参数
         ThrowUtils.throwIf(StringUtils.isBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "图表名称不能为空");
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "图表目标不能为空");
-        ThrowUtils.throwIf(StringUtils.isBlank(chartType), ErrorCode.PARAMS_ERROR, "图表类型不能为空");
 
-        //用户输入
+        // 通过response对象拿到用户id(必须登录才能使用)
+        User loginUser = userService.getLoginUser(request);
+
+        // 指定一个模型id(把id写死，也可以定义成一个常量)
+        long biModelId = 1844332477390974977L;
+
+        // 构造用户输入
         StringBuilder userInput = new StringBuilder();
-        userInput.append("你是一个数据分析师，接下来我会给你我的分析目标和原始数据，请告诉我分析结论。").append("\n");
-        userInput.append("分析目标：" + goal).append("\n");
-        // 压缩后的数据
-        String result = ExcelUtils.excelToCsv(multipartFile);
-        userInput.append("数据：" + result).append("\n");
-        return ResultUtils.success(userInput.toString());
+        userInput.append("分析需求：").append("\n");
 
-//        // 获取登录态用户
-//        User loginUser = userService.getLoginUser(request);
-//        // 文件目录：根据业务、用户来划分
-//        String uuid = RandomStringUtils.randomAlphanumeric(8);
-//        // getOriginalFilename()：获取原始文件名（包括扩展名）
-//        String filename = uuid + "-" + multipartFile.getOriginalFilename();
-//        File file = null;
-//        try {
-//            // 返回可访问地址
-//            return ResultUtils.success("");
-//        } catch (Exception e) {
-//            // log.error("file upload error, filepath = " + filepath, e);
-//            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-//        } finally {
-//            if (file != null) {
-//                // 删除临时文件
-//                boolean delete = file.delete();
-//                if (!delete) {
-//                // log.error("file delete error, filepath = {}", filepath);
-//                }
-//            }
-//        }
+        // 拼接分析目标
+        String userGoal = goal;
+        // 如果图表类型不为空
+        if (StringUtils.isNotBlank(chartType)) {
+            // 就将分析目标拼接上“请使用”+图表类型
+            userGoal += "，请使用" + chartType;
+        }
+        userInput.append(userGoal).append("\n");
+        userInput.append("原始数据：").append("\n");
+        // 压缩后的数据（把multipartFile传进来）
+        String csvData = ExcelUtils.excelToCsv(multipartFile);
+        userInput.append(csvData).append("\n");
+
+        // 拿到返回结果
+        String result = aiManager.doChat(biModelId,userInput.toString());
+        // 对返回结果做拆分,按照5个中括号进行拆分
+        String[] splits = result.split("【【【【【");
+        // 拆分之后还要进行校验
+        if (splits.length < 3) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
+        }
+        String genChart = splits[1].trim();
+        String genResult = splits[2].trim();
+        // 插入到数据库
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(csvData);
+        chart.setChartType(chartType);
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
+        chart.setUserId(loginUser.getId());
+        boolean saveResult = chartService.save(chart);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+        // 构造返回值
+        BiResponse biResponse = new BiResponse();
+        biResponse.setGenChart(genChart);
+        biResponse.setGenResult(genResult);
+        biResponse.setChartId(chart.getId());
+
+        return ResultUtils.success(biResponse);
+
     }
-
 
 }
