@@ -8,7 +8,7 @@ import java.io.Serializable;
  * 文件上传请求
  */
 @Data
-public class GenCharByAiRequest implements Serializable {
+public class GenChartByAiRequest implements Serializable {
 
     /**
      * 图标名称

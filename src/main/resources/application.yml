@@ -1,6 +1,4 @@
 # 公共配置文件
-# @author <a href="https://github.com/liyupi">程序员鱼皮</a>
-# @from <a href="https://yupi.icu">编程导航知识星球</a>
 spring:
   application:
     name: bi-center-backend
@@ -27,6 +25,7 @@ spring:
     port: 6379
     host: localhost
     database: 1
+    timeout: 5000
   # Elasticsearch 配置
   # todo 需替换配置，然后取消注释
 #  elasticsearch:

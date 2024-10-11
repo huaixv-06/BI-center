@@ -117,6 +117,12 @@
             <artifactId>yucongming-java-sdk</artifactId>
             <version>0.0.4</version>
         </dependency>
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.21.3</version>
+        </dependency>
+
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
