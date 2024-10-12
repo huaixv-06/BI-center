@@ -12,6 +12,6 @@ public class BiResponse {
 
     private String genResult;
 
-    private Long chartId;   // 新生成的图标id
+    private Long chartId;   // 新生成的图表id
 
 }

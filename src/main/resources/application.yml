@@ -16,9 +16,8 @@ spring:
     pathmatch:
       matching-strategy: ant_path_matcher
   # session 配置
-  # session 失效时间（分钟）
   session:
-    timeout: 86400
+    timeout: 86400 # session 失效时间（分钟）
     store-type: redis
   # redis 配置
   redis:
@@ -26,17 +25,17 @@ spring:
     host: localhost
     database: 1
     timeout: 5000
-  # Elasticsearch 配置
-  # todo 需替换配置，然后取消注释
-#  elasticsearch:
-#    uris: http://localhost:9200
-#    username: root
-#    password: 123456
   # 文件上传
   servlet:
     multipart:
       # 大小限制
       max-file-size: 10MB
+  # rabbitmq 配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 # 微信相关
 wx:
   # 微信公众平台
