@@ -56,7 +56,7 @@ public class BiMessageConsumer {
         Chart updateChart = new Chart();
         updateChart.setId(chart.getId());
         // 设置任务状态为执行中
-        chart.setStatus("running");
+        updateChart.setStatus("running");
         boolean Result = chartService.updateById(updateChart);
         if (!Result) {
             channel.basicNack(deliveryTag, false, false);
@@ -64,7 +64,7 @@ public class BiMessageConsumer {
             return;
         }
         // 调用 AI
-        String result = aiManager.doChat(CommonConstant.BI_MODAL_ID, buildUserInput(chart));
+        String result = aiManager.doChat(CommonConstant.BI_MODAL_ID, chartService.buildUserInput(chart));
         String[] splits = result.split("【【【【【");
         if (splits.length < 3) {
             channel.basicNack(deliveryTag, false, false);
@@ -90,39 +90,44 @@ public class BiMessageConsumer {
         channel.basicAck(deliveryTag, false);
     }
 
-    /**
-     * 构建用户输入
-     * @param chart 图表对象
-     * @return 用户输入字符串
-     */
-    private String buildUserInput(Chart chart) {
-        // 获取图表的目标、类型和数据
-        String goal = chart.getGoal();
-        String chartType = chart.getChartType();
-        String csvData = chart.getChartData();
-
-        // 构造用户输入
-        StringBuilder userInput = new StringBuilder();
-        userInput.append("分析需求：").append("\n");
-
-        // 拼接分析目标
-        String userGoal = goal;
-        if (StringUtils.isNotBlank(chartType)) {
-            userGoal += "，请使用" + chartType;
+    @SneakyThrows
+    @RabbitListener(queues = {BiMqConstant.BI_DEAD_QUEUE}, ackMode = "MANUAL")
+    public void receiveDeadLetterMessage(String message, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
+        if (StringUtils.isBlank(message)) {
+            channel.basicNack(deliveryTag, false, false);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "死信消息内容为空");
         }
-        userInput.append(userGoal).append("\n");
-        userInput.append("原始数据：").append("\n");
-        userInput.append(csvData).append("\n");
-        // 将StringBuilder转换为String并返回
-        return userInput.toString();
+
+        long chartId = Long.parseLong(message);
+        Chart chart = chartService.getById(chartId);
+        if (chart == null) {
+            channel.basicNack(deliveryTag, false, false);
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "图表未找到");
+        }
+
+        // 处理死信
+        Chart updateChart = new Chart();
+        updateChart.setId(chart.getId());
+        // 设置任务状态为执行中
+        updateChart.setStatus("failed");
+        boolean result = chartService.updateById(updateChart);
+        if (!result) {
+            channel.basicNack(deliveryTag, false, false);
+            handleChartUpdateError(chart.getId(), "修改图表状态失败");
+            return;
+        }
+
+        // 使用日志记录器打印接收到的死信消息内容
+        log.info("receiveDeadLetterMessage message = {}", message);
+
+        // 手动确认消息，表示消息已经被成功处理
+        channel.basicAck(deliveryTag, false);
     }
-
-
 
     private void handleChartUpdateError(Long chartId, String execMessage) {
         Chart updateChart = new Chart();
         updateChart.setId(chartId);
-        updateChart.setStatus("false");
+        updateChart.setStatus("failed");
         updateChart.setExecMessage(execMessage);
         boolean updateByIdResult = chartService.updateById(updateChart);
         if (!updateByIdResult) {

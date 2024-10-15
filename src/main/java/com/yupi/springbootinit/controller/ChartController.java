@@ -13,6 +13,7 @@ import com.yupi.springbootinit.constant.CommonConstant;
 import com.yupi.springbootinit.constant.UserConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.exception.ThrowUtils;
+import com.yupi.springbootinit.job.RetryQueueService;
 import com.yupi.springbootinit.manager.AiManager;
 import com.yupi.springbootinit.manager.RedisLimiterManager;
 import com.yupi.springbootinit.model.dto.chart.*;
@@ -34,8 +35,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.*;
 
 /**
  * 帖子接口
@@ -62,6 +62,11 @@ public class ChartController {
 
     @Resource
     private BiMessageProducer biMessageProducer;
+
+    @Resource
+    private RetryQueueService retryQueueService;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     // region 增删改查
 
@@ -280,7 +285,7 @@ public class ChartController {
      * @param request
      * @return
      */
-    @PostMapping("/upload")
+    @PostMapping("/gen")
     public BaseResponse<BiResponse> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
                                            GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
         String name = genChartByAiRequest.getName();
@@ -291,28 +296,15 @@ public class ChartController {
         ThrowUtils.throwIf(StringUtils.isBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "图表名称不能为空");
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "图表目标不能为空");
 
-        /**
-         * 校验文件
-         * 首先,拿到用户请求的文件;
-         * 取到原始文件大小
-         */
+        // 校验文件
         long size = multipartFile.getSize();
         // 取到原始文件名
         String originalFilename = multipartFile.getOriginalFilename();
-
-        /**
-         * 校验文件大小
-         * 定义一个常量表示1MB;
-         * 一兆(1MB) = 1024*1024字节(Byte) = 2的20次方字节
-         */
+        // 校验文件大小
         final long ONE_MB = 1024 * 1024L;
         // 如果文件大小,大于一兆,就抛出异常,并提示文件超过1M
         ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
-
-        /**
-         * 校验文件后缀(一般文件是aaa.png,我们要取到.<点>后面的内容)
-         * 利用FileUtil工具类中的getSuffix方法获取文件后缀名(例如:aaa.png,suffix应该保存为png)
-         */
+        // 校验文件后缀
         String suffix = FileUtil.getSuffix(originalFilename);
         // 定义合法的后缀列表
         final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
@@ -321,14 +313,12 @@ public class ChartController {
 
         // 通过response对象拿到用户id(必须登录才能使用)
         User loginUser = userService.getLoginUser(request);
-
         // 限流判断，每一个用户一个限流器
         redisLimiterManager.doRateLimit("genChartByAi" + loginUser.getId());
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
         userInput.append("分析需求：").append("\n");
-
         // 拼接分析目标
         String userGoal = goal;
         // 如果图表类型不为空
@@ -381,7 +371,7 @@ public class ChartController {
      * @param request
      * @return
      */
-    @PostMapping("/gen")
+    @PostMapping("/gen/async")
     public BaseResponse<BiResponse> genChartByAiAsync(@RequestPart("file") MultipartFile multipartFile,
                                                  GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
         String name = genChartByAiRequest.getName();
@@ -395,16 +385,13 @@ public class ChartController {
         // 校验文件
         long size = multipartFile.getSize();
         String originalFilename = multipartFile.getOriginalFilename();
-
         // 校验文件大小
         final long ONE_MB = 1024 * 1024L;
         ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
-
         // 校验文件大小缀 aaa.png
         String suffix = FileUtil.getSuffix(originalFilename);
         final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
         ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
-
 
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
@@ -440,14 +427,12 @@ public class ChartController {
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
 
-        // 在最终的返回结果前提交一个任务
-        // todo 建议处理任务队列满了后,抛异常的情况(因为提交任务报错了,前端会返回异常)
-        CompletableFuture.runAsync(() -> {
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
             // 先修改图标执行任务状态为“执行中”
             Chart updateChart = new Chart();
             updateChart.setId(chart.getId());
             // 设置任务状态为执行中
-            chart.setStatus("running");
+            updateChart.setStatus("running");
             boolean Result = chartService.updateById(updateChart);
             if (!Result) {
                 handleChartUpdateError(chart.getId(), "修改图表状态失败");
@@ -473,7 +458,36 @@ public class ChartController {
             if (!updateByIdResult) {
                 handleChartUpdateError(chart.getId(), "修改图表状态失败");
             }
-        },threadPoolExecutor);
+        }, threadPoolExecutor);
+
+        // 记录超时任务的Future以便我们可以取消它
+        ScheduledFuture<?> scheduledFuture = scheduler.schedule(() -> {
+            // 超时后的处理逻辑
+            // 修改图表状态为失败并抛出超时异常
+            Chart timeoutChart = new Chart();
+            timeoutChart.setId(chart.getId());
+            timeoutChart.setStatus("failed");
+            chartService.updateById(timeoutChart); // 假设这个方法更新图标状态
+            log.error("任务执行超时，已终止");
+            // 终止异步任务
+            future.cancel(true);
+        }, 10, TimeUnit.MINUTES); // 设置10分钟的超时时间
+
+        // 处理异步任务的异常情况
+        future.exceptionally(ex -> {
+            if (ex instanceof CancellationException && !scheduledFuture.isCancelled()) {
+                // 如果异步任务被超时任务取消，这里不处理
+                return null;
+            } else if (ex.getCause() instanceof RejectedExecutionException) {
+                log.error("任务队列满，无法执行任务: {}", ex.getCause().getMessage());
+                Long id = chart.getId();
+                retryQueueService.offer(id); // 将 ID 放入重试队列
+            } else {
+                // 处理其他异常情况
+                log.error("异步任务发生异常", ex);
+            }
+            return null;
+        });
 
         BiResponse biResponse = new BiResponse();
         // biResponse.setGenChart(genChart);
@@ -490,7 +504,7 @@ public class ChartController {
      * @param request
      * @return
      */
-    @PostMapping("/gen")
+    @PostMapping("/gen/async/mq")
     public BaseResponse<BiResponse> genChartByAiAsyncMq(@RequestPart("file") MultipartFile multipartFile,
                                                  GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
         String name = genChartByAiRequest.getName();
@@ -518,9 +532,6 @@ public class ChartController {
 
         // 限流判断，每个用户一个限流器
         redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
-
-        // 指定一个模型id(把id写死，也可以定义成一个常量)
-        long biModelId = 1844332477390974977L;
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
@@ -558,7 +569,7 @@ public class ChartController {
     private void handleChartUpdateError(Long chartId, String execMessage) {
         Chart updateChart = new Chart();
         updateChart.setId(chartId);
-        updateChart.setStatus("false");
+        updateChart.setStatus("failed");
         updateChart.setExecMessage(execMessage);
         boolean updateByIdResult = chartService.updateById(updateChart);
         if (!updateByIdResult) {

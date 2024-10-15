@@ -6,8 +6,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/bi_center
-    username: root
-    password: xxxxxx
+    username: ENC(qcb+uqKjL8NFq5PJm7ws/g==)
+    password: ENC(uFKzVrLt4Ci4k2w8HemrpQIOWY2yxJGq)
   # 默认 dev 环境
   profiles:
     active: dev
@@ -94,3 +94,13 @@ yuapi:
   client:
     access-key: xxxxxx
     secret-key: xxxxxx
+# 如果密文加盐，需要配置盐值
+jasypt:
+  encryptor:
+    password: huaixv_06
+## 讯飞 AI 配置
+xun-fei:
+  client:
+    appId:
+    apiSecret:
+    apiKey:

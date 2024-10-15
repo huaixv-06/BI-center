@@ -6,15 +6,21 @@ import com.yupi.yucongming.dev.client.YuCongMingClient;
 import com.yupi.yucongming.dev.common.BaseResponse;
 import com.yupi.yucongming.dev.model.DevChatRequest;
 import com.yupi.yucongming.dev.model.DevChatResponse;
+import io.github.briqt.spark4j.SparkClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 
 @Service
+@Slf4j
 public class AiManager {
 
     @Resource
     private YuCongMingClient yuCongMingClient;
+
+    @Resource
+    private SparkClient sparkClient;
 
     /**
      * AI 对话
