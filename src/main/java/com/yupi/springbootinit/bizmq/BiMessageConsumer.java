@@ -3,16 +3,13 @@ package com.yupi.springbootinit.bizmq;
 import com.rabbitmq.client.Channel;
 import com.yupi.springbootinit.common.ErrorCode;
 import com.yupi.springbootinit.constant.BiMqConstant;
-import com.yupi.springbootinit.constant.CommonConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.manager.AiManager;
 import com.yupi.springbootinit.model.entity.Chart;
 import com.yupi.springbootinit.service.ChartService;
-import com.yupi.springbootinit.utils.ExcelUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.elasticsearch.script.BucketAggregationSelectorScript;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -64,8 +61,10 @@ public class BiMessageConsumer {
             return;
         }
         // 调用 AI
-        String result = aiManager.doChat(CommonConstant.BI_MODAL_ID, chartService.buildUserInput(chart));
-        String[] splits = result.split("【【【【【");
+        // String result = aiManager.doChat(CommonConstant.BI_MODAL_ID, chartService.buildUserInput(chart));
+        String userInput = chartService.buildUserInput(chart);
+        String result = aiManager.sendMsgToXingHuo(true, userInput);
+        String[] splits = result.split("'【【【【【'");
         if (splits.length < 3) {
             channel.basicNack(deliveryTag, false, false);
             handleChartUpdateError(chart.getId(), "图表生成失败");

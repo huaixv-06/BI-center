@@ -333,9 +333,10 @@ public class ChartController {
         userInput.append(csvData).append("\n");
 
         // 拿到返回结果
-        String result = aiManager.doChat(CommonConstant.BI_MODAL_ID,userInput.toString());
+        // String result = aiManager.doChat(CommonConstant.BI_MODAL_ID,userInput.toString());
+        String result = aiManager.sendMsgToXingHuo(true, userInput.toString());
         // 对返回结果做拆分,按照5个中括号进行拆分
-        String[] splits = result.split("【【【【【");
+        String[] splits = result.split("'【【【【【'");
         // 拆分之后还要进行校验
         if (splits.length < 3) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
@@ -440,8 +441,9 @@ public class ChartController {
             }
 
             // 调用 AI
-            String result = aiManager.doChat(CommonConstant.BI_MODAL_ID, userInput.toString());
-            String[] splits = result.split("【【【【【");
+            // String result = aiManager.doChat(CommonConstant.BI_MODAL_ID, userInput.toString());
+            String result = aiManager.sendMsgToXingHuo(true, userInput.toString());
+            String[] splits = result.split("'【【【【【'");
             if (splits.length < 3) {
                 handleChartUpdateError(chart.getId(), "图表生成失败");
                 return;

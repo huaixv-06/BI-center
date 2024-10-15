@@ -101,6 +101,6 @@ jasypt:
 ## 讯飞 AI 配置
 xun-fei:
   client:
-    appId:
-    apiSecret:
-    apiKey:
+    appId: 6f48d085
+    apiSecret: Mjk3NDQ0ZmFlYTZkOGUyNDRkZTIwMjRi
+    apiKey: d3b31d49ac10ba3b43c6527309ff4813
