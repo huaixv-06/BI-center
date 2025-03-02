@@ -18,12 +18,12 @@ AIGC：AI 生成内容
 
 ### 后端
 
-Java Spring Boot
-MySQL 数据库
-MyBatis-Plus 及 MyBatis X 自动生成
-Redis + Redisson 限流
-RabbitMQ 消息队列
-讯飞星火 AI SDK（AI 能力）
-JDK 线程池及异步化
-Swagger + Knife4j 接口文档生成
-Hutool、Apache Common Utils 等工具库
+- Java Spring Boot
+- MySQL 数据库
+- MyBatis-Plus 及 MyBatis X 自动生成
+- Redis + Redisson 限流
+- RabbitMQ 消息队列
+- 讯飞星火 AI SDK（AI 能力）
+- JDK 线程池及异步化
+- Swagger + Knife4j 接口文档生成
+- Hutool、Apache Common Utils 等工具库
