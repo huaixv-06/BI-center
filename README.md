@@ -1,6 +1,6 @@
 ## 项目介绍
 
-基于 React + Spring Boot + MQ + AIGC 的智能数据分析平台。
+基于 Spring Boot + MQ + AIGC 的智能数据分析平台。
 
 区别于传统 BI，用户只需要导入原始数据集、并输入分析诉求，就能自动生成可视化图表及分析结论，实现数据分析的降本增效。
 
@@ -27,3 +27,5 @@ AIGC：AI 生成内容
 - JDK 线程池及异步化
 - Swagger + Knife4j 接口文档生成
 - Hutool、Apache Common Utils 等工具库
+
+项目在本地启动后可访问 http://localhost:端口号/api/doc.html#/home 打开 Swagger + Knife4j 自动生成的接口文档
